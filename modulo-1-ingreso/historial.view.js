@@ -17,6 +17,11 @@ const HistorialView = (() => {
             📥 Importar Lote
             <input type="file" accept=".json" style="display:none" onchange="_histImportarLote(this)">
           </label>
+          <button class="btn btn-secondary btn-sm" onclick="HistorialView._descargarPlantillaExcel()" title="Descargar plantilla base de Excel para evitar errores al importar" style="color:var(--success)">📄 Plantilla Excel</button>
+          <label class="btn btn-secondary btn-sm" style="cursor:pointer;display:inline-flex;align-items:center;gap:4px;border-color:var(--success);color:var(--success)" title="Cargar lote desde Excel (Código y Falla)">
+            📊 Cargar Excel
+            <input type="file" accept=".xlsx, .xls, .csv" style="display:none" onchange="HistorialView._histCargarExcel(this)">
+          </label>
           <button class="btn btn-primary btn-sm" onclick="Views.go('ingreso')">➕ Nuevo Registro</button>
         </div>
       </div>
@@ -194,6 +199,103 @@ const HistorialView = (() => {
     }
   };
 
+  function _descargarPlantillaExcel() {
+    if (typeof XLSX === 'undefined') { Toast.error('Librería Excel no cargada'); return; }
+    const wb = XLSX.utils.book_new();
+    // Modelo base con relleno de ejemplo
+    const ws = XLSX.utils.aoa_to_sheet([
+      ['CODIGO', 'FALLA'],
+      ['P19153', 'Pantalla rota'],
+      ['P28434', 'Teclado falla (teclas saltan)'],
+      ['P27466', 'No enciende, placa quemada']
+    ]);
+    ws['!cols'] = [{wch: 15}, {wch: 40}];
+    XLSX.utils.book_append_sheet(wb, ws, 'Importar Lote');
+    XLSX.writeFile(wb, 'Plantilla_Ingreso_Lote.xlsx');
+    Toast.success('Plantilla descargada');
+  }
+
+  async function _histCargarExcel(input) {
+    if (!input.files || !input.files[0]) return;
+    if (typeof XLSX === 'undefined') { Toast.error('Librería Excel no cargada'); return; }
+    
+    const file = input.files[0];
+    const reader = new FileReader();
+    
+    Toast.info('Procesando Excel...');
+    
+    reader.onload = async (e) => {
+      try {
+        const data = new Uint8Array(e.target.result);
+        const workbook = XLSX.read(data, { type: 'array' });
+        const firstSheetName = workbook.SheetNames[0];
+        const worksheet = workbook.Sheets[firstSheetName];
+        
+        // Convertir a JSON
+        const rows = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+        if (rows.length < 2) throw new Error('El archivo está vacío o no tiene encabezados');
+        
+        // Buscar índices de las columnas
+        const headers = rows[0].map(h => String(h||'').toUpperCase().trim());
+        const colCodigo = headers.findIndex(h => h === 'CODIGO' || h === 'CÓDIGO' || h === 'SERIE');
+        const colFalla = headers.findIndex(h => h === 'FALLA' || h === 'OBSERVACION' || h === 'OBSERVACIÓN');
+        
+        if (colCodigo === -1) throw new Error('No se encontró una columna llamada "CODIGO" o "SERIE". Usa la plantilla base.');
+        
+        // Crear Lote
+        const loteTitulo = `LOTE IMPORTADO - ${new Date().toLocaleDateString('es-PE')} ${new Date().toLocaleTimeString('es-PE')}`;
+        const nuevoLote = await LocalCache.crearLote(loteTitulo, window.AuthService?.getCurrentUser()?.username || 'admin', 'ENVIO / REPARACION EXTERNA');
+        let agregados = 0;
+        let noEncontrados = 0;
+        
+        for (let i = 1; i < rows.length; i++) {
+          const row = rows[i];
+          const codigo = String(row[colCodigo] || '').trim();
+          const falla = colFalla !== -1 ? String(row[colFalla] || '').trim() : '';
+          
+          if (!codigo) continue;
+          
+          const equipo = await SheetsAPI.findByCodigoOSerie(codigo);
+          if (equipo) {
+            const registro = { ...equipo };
+            registro._registroId = 'reg_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5);
+            registro._timestamp = new Date().toISOString();
+            registro._estadoOriginal = registro.ESTADO || '';
+            registro.ESTADO = 'M'; // Por defecto estado Malogrado/Revisión? No, lo dejamos igual pero le ponemos falla
+            registro._fallaReportada = falla;
+            registro._tecnico = nuevoLote.tecnico;
+            
+            if (!nuevoLote.equipos) nuevoLote.equipos = [];
+            nuevoLote.equipos.push(registro);
+            
+            // Log de auditoría
+            AuditTrail.log('CREATE', 'EQUIPO_LOTE', { codigo, lote: nuevoLote.titulo }).catch(()=>{});
+            agregados++;
+          } else {
+            noEncontrados++;
+          }
+        }
+        
+        if (agregados > 0) {
+          await LocalCache.updateLote(nuevoLote);
+          // Setear como activo
+          await LocalCache.setLoteActivo(nuevoLote.id);
+          Toast.success(`Lote creado con ${agregados} equipos. ${noEncontrados ? `(Omitidos ${noEncontrados} no encontrados en la BD)` : ''}`);
+          Views.go('ingreso'); // Ir directamente a la vista de ingreso para revisarlo
+        } else {
+          await LocalCache.eliminarLote(nuevoLote.id);
+          Toast.warning('Ningún código del Excel existe en tu base de datos.');
+        }
+        
+      } catch (err) {
+        Toast.error(err.message || 'Error al procesar el Excel');
+      } finally {
+        input.value = ''; // Reset input
+      }
+    };
+    reader.readAsArrayBuffer(file);
+  }
+
   return { 
     render, 
     _histToggle, 
@@ -201,7 +303,9 @@ const HistorialView = (() => {
     _histContinuar, 
     _histEditar, 
     _histGuardarEdicion, 
-    _histImportarLote 
+    _histImportarLote,
+    _descargarPlantillaExcel,
+    _histCargarExcel
   };
 })();
 

@@ -45,8 +45,10 @@ const IngresoSoporteInline = (() => {
   async function _sopAgregarRepuesto(regId) {
     const sel = document.getElementById('sop-rep-' + regId);
     const pnEl = document.getElementById('sop-pn-'  + regId);
+    const linkEl = document.getElementById('sop-link-' + regId);
     const repuesto = sel?.value?.trim();
     const pn       = pnEl?.value?.trim();
+    const link     = linkEl?.value?.trim();
     if (!repuesto) { Toast.warning('Selecciona un tipo de repuesto'); return; }
     if (window.AuthService && window._loteActivo && !AuthService.canEditLote(window._loteActivo)) { Toast.error('🔒 Lote de solo lectura'); return; }
     
@@ -58,7 +60,7 @@ const IngresoSoporteInline = (() => {
       if (!eq._repuestosUsados) eq._repuestosUsados = [];
       const nombre = repuesto + (pn ? ' (PN: ' + pn + ')' : '');
       if (!eq._repuestosUsados.find(r => r.repuesto === repuesto && r.pn === pn)) {
-        eq._repuestosUsados.push({ nombre, repuesto, pn, timestamp: new Date().toISOString() });
+        eq._repuestosUsados.push({ nombre, repuesto, pn, link, timestamp: new Date().toISOString() });
       }
       eq._estadoSoporte = eq._estadoSoporte || 'RECIBIDO';
       eq._tecnico = eq._tecnico || (window._loteActivo?.tecnico || '');
@@ -224,6 +226,21 @@ const IngresoSoporteInline = (() => {
     }
   }
 
+  async function _sopActualizarFalla(regId, falla) {
+    if (window.AuthService && window._loteActivo && !AuthService.canEditLote(window._loteActivo)) return;
+    const lotes = await LocalCache.getLotes();
+    for (const lote of lotes) {
+      const eq = lote.equipos?.find(e => e._registroId === regId);
+      if (!eq) continue;
+      
+      eq._fallaReportada = falla;
+      eq._lastModified = new Date().toISOString();
+      await LocalCache.updateLote(lote);
+      window._loteActivo = await LocalCache.getLoteActivo();
+      return;
+    }
+  }
+
   return { 
     init, 
     _sopOnRepuestoChange, 
@@ -236,7 +253,8 @@ const IngresoSoporteInline = (() => {
     _sopFiltrarBuscador, 
     _sopSeleccionarDeBuscador, 
     _sopAutocompletarPN, 
-    _garGuardar 
+    _garGuardar,
+    _sopActualizarFalla
   };
 })();
 

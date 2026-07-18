@@ -104,37 +104,54 @@ const IngresoTabla = (() => {
     return `<td style="min-width:360px">
       <div style="display:flex;flex-direction:column;gap:5px">
         <!-- Chips existentes -->
-        ${chipsHtml ? `<div style="display:flex;flex-wrap:wrap;gap:3px">${chipsHtml}</div>` : ''}
+        ${chipsHtml ? `<div style="display:flex;flex-wrap:wrap;gap:3px;margin-bottom:6px">${chipsHtml}</div>` : ''}
 
-        <!-- Fila de nuevo repuesto: solo registra con Enter o clic + -->
-        <div style="display:flex;align-items:center;gap:4px;flex-wrap:wrap" id="sop-row-${eq._registroId}">
-          <select id="sop-rep-${eq._registroId}" class="form-control" style="width:auto;min-width:100px;font-size:0.72rem;padding:3px 6px;height:26px"
-            onchange="IngresoSoporteInline._sopOnRepuestoChange('${eq._registroId}','${(eq.MODELO||'').replace(/'/g,'')}')">
-            <option value="">Repuesto…</option>
-            ${tiposR.map(t => `<option value="${t}" ${!repuestos.length && t === stickyRepuesto ? 'selected' : ''}>${t}</option>`).join('')}
-          </select>
-          <input type="text" id="sop-pn-${eq._registroId}" class="form-control"
-            placeholder="PN (Enter = guardar)"
-            value="${repuestos.length ? '' : (stickyPN || '')}"
-            style="width:100px;font-size:0.72rem;padding:3px 6px;height:26px"
-            oninput="IngresoSoporteInline._sopOnPNInput('${eq._registroId}',this.value)"
-            onkeydown="if(event.key==='Enter'){event.preventDefault();IngresoSoporteInline._sopAgregarRepuesto('${eq._registroId}');}">
-          <!-- 🔍 Buscador DB de repuestos -->
-          <button onclick="IngresoSoporteInline._sopAbrirBuscador('${eq._registroId}','${(eq.MODELO||'').replace(/'/g,'')}','${(eq.SERIE||'').replace(/'/g,'')}')" title="Buscar en base de repuestos"
-            style="background:var(--bg-hover);border:1px solid var(--border);border-radius:4px;cursor:pointer;height:26px;padding:0 7px;font-size:0.85rem;color:var(--text-secondary)">
-            🔍
-          </button>
-          <button onclick="IngresoSoporteInline._sopAgregarRepuesto('${eq._registroId}')"
-            style="background:#7c3aed;color:#fff;border:none;border-radius:4px;padding:3px 8px;font-size:0.7rem;cursor:pointer;height:26px;white-space:nowrap"
-            title="Agregar repuesto">
-            ➕
-          </button>
-          <div style="width:1px;height:20px;background:var(--border);flex-shrink:0"></div>
-          <button class="btn btn-sm btn-icon" title="Soporte Avanzado" style="font-size:1.1rem"
-            onclick="IngresoView.abrirSoporte('${eq._registroId}')">⚙️</button>
-          <button class="btn btn-sm btn-icon" style="font-size:1.1rem;filter:grayscale(100%)" title="Quitar"
-            onmouseover="this.style.filter='grayscale(0)'" onmouseout="this.style.filter='grayscale(100%)'"
-            onclick="IngresoView.quitarEquipo('${loteActivo.id}','${eq._registroId}')">🗑️</button>
+        <div style="display:flex;flex-direction:column;gap:6px;background:var(--bg-hover);padding:8px;border-radius:6px;border:1px dashed rgba(124,58,237,0.3)">
+          <!-- Fila 1: Falla y herramientas -->
+          <div style="display:flex;gap:4px;align-items:center">
+            <input type="text" class="form-control" placeholder="Falla reportada (Ej. Pantalla rota)" 
+              value="${eq._fallaReportada||''}" 
+              onblur="IngresoSoporteInline._sopActualizarFalla('${eq._registroId}', this.value)" 
+              style="flex:1;font-size:0.75rem;height:26px">
+            <div style="width:1px;height:20px;background:var(--border);margin:0 4px"></div>
+            <button class="btn btn-sm btn-icon" title="Soporte Avanzado" style="font-size:1.1rem"
+              onclick="IngresoView.abrirSoporte('${eq._registroId}')">⚙️</button>
+            <button class="btn btn-sm btn-icon" style="font-size:1.1rem;filter:grayscale(100%)" title="Quitar equipo"
+              onmouseover="this.style.filter='grayscale(0)'" onmouseout="this.style.filter='grayscale(100%)'"
+              onclick="IngresoView.quitarEquipo('${loteActivo.id}','${eq._registroId}')">🗑️</button>
+          </div>
+          
+          <!-- Fila 2: Repuesto, PN y Buscador -->
+          <div style="display:flex;gap:4px;align-items:center;flex-wrap:wrap">
+            <select id="sop-rep-${eq._registroId}" class="form-control" style="flex:1;min-width:120px;font-size:0.75rem;height:26px"
+              onchange="IngresoSoporteInline._sopOnRepuestoChange('${eq._registroId}','${(eq.MODELO||'').replace(/'/g,'')}')">
+              <option value="">Repuesto…</option>
+              ${tiposR.map(t => `<option value="${t}" ${!repuestos.length && t === stickyRepuesto ? 'selected' : ''}>${t}</option>`).join('')}
+            </select>
+            <input type="text" id="sop-pn-${eq._registroId}" class="form-control"
+              placeholder="PN (Opcional)"
+              value="${repuestos.length ? '' : (stickyPN || '')}"
+              style="width:90px;font-size:0.75rem;height:26px"
+              oninput="IngresoSoporteInline._sopOnPNInput('${eq._registroId}',this.value)"
+              onkeydown="if(event.key==='Enter'){event.preventDefault();IngresoSoporteInline._sopAgregarRepuesto('${eq._registroId}');}">
+            <button onclick="IngresoSoporteInline._sopAbrirBuscador('${eq._registroId}','${(eq.MODELO||'').replace(/'/g,'')}','${(eq.SERIE||'').replace(/'/g,'')}')" title="Buscar en base de repuestos"
+              style="background:var(--bg-hover);border:1px solid var(--border);border-radius:4px;cursor:pointer;height:26px;padding:0 7px;font-size:0.85rem;color:var(--text-secondary)">
+              🔍
+            </button>
+          </div>
+          
+          <!-- Fila 3: Link AliExpress -->
+          <div style="display:flex;gap:4px;align-items:center">
+            <input type="url" id="sop-link-${eq._registroId}" class="form-control" 
+              placeholder="🔗 Link AliExpress (Opcional)" 
+              style="flex:1;font-size:0.75rem;height:26px"
+              onkeydown="if(event.key==='Enter'){event.preventDefault();IngresoSoporteInline._sopAgregarRepuesto('${eq._registroId}');}">
+            <button onclick="IngresoSoporteInline._sopAgregarRepuesto('${eq._registroId}')"
+              style="background:#7c3aed;color:#fff;border:none;border-radius:4px;padding:3px 12px;font-size:0.72rem;font-weight:600;cursor:pointer;height:26px;white-space:nowrap"
+              title="Agregar repuesto">
+              ➕ Agregar
+            </button>
+          </div>
         </div>
         <!-- Panel buscador inline (se despliega aqui) -->
         <div id="sop-search-${eq._registroId}" style="display:none"></div>
