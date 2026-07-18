@@ -17,6 +17,13 @@ const IngresoLoteModal = (() => {
         <label class="form-label">👨‍🔧 Técnico Encargado</label>
         <input type="text" class="form-control" id="nuevo-lote-tecnico" placeholder="Nombre del técnico…" autocomplete="off">
       </div>
+      <div class="form-group">
+        <label class="form-label">🏷️ Tipo de Lote</label>
+        <select class="form-control" id="nuevo-lote-tipo">
+          <option value="">— Ninguno —</option>
+          ${(APP_CONFIG.catalogos.tiposLote || []).map(t => `<option value="${t}">${t}</option>`).join('')}
+        </select>
+      </div>
       <div class="modal-footer">
         <button class="btn btn-secondary" onclick="ModalGenerico.close()">Cancelar</button>
         <button class="btn btn-primary" onclick="IngresoLoteModal.confirmar(IngresoView.render)">Crear Lote</button>
@@ -33,9 +40,10 @@ const IngresoLoteModal = (() => {
   async function confirmar(onRenderCallback) {
     const titulo   = document.getElementById('nuevo-lote-titulo')?.value?.trim();
     const tecnico  = document.getElementById('nuevo-lote-tecnico')?.value?.trim() || '';
+    const tipoLote = document.getElementById('nuevo-lote-tipo')?.value || '';
     if (!titulo) { Toast.warning('Escribe un título'); return; }
     
-    window._loteActivo = await LocalCache.crearLote(titulo, tecnico);
+    window._loteActivo = await LocalCache.crearLote(titulo, tecnico, tipoLote);
     
     ModalGenerico.close();
     Toast.success(`Lote "${titulo}" creado`);

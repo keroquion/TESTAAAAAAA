@@ -93,6 +93,7 @@ const APP_CONFIG = {
     sucursales:    ['LEON','EJERCITO'],
     proveedores:   ['PROVEEDOR A','PROVEEDOR B'],
     tiposRepuesto: ['PANTALLA','TECLADO','BATERÍA','CARGADOR','RAM','DISCO','CARCASA','TOUCHPAD','BISAGRA','FLEX'],
+    tiposLote:     ['LOCAL PERU (2-5 días)', 'IMPORTACION (15-30 días)', 'ENVIO / REPARACION EXTERNA', 'OTROS'],
   },
 
   // ── Admin / Seguridad ────────────────────────────────────────────

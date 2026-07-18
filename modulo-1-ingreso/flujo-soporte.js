@@ -99,7 +99,7 @@ const FlujoSoporte = (() => {
         <div id="repuestos-list" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px">
           ${repuestos.map((r, i) => `
             <span class="badge badge-accent" style="gap:6px">
-              ${r.nombre}
+              ${r.nombre} ${r.link ? `<a href="${r.link}" target="_blank" style="text-decoration:none" title="Ver Link">🔗</a>` : ''}
               <button onclick="FlujoSoporte.quitarRepuesto('${registro._registroId}',${i})" style="background:none;border:none;cursor:pointer;color:inherit;font-size:0.8rem;line-height:1">✕</button>
             </span>
           `).join('')}
@@ -110,6 +110,7 @@ const FlujoSoporte = (() => {
             ${(APP_CONFIG.catalogos.tiposRepuesto||[]).map(r=>`<option value="${r}">${r}</option>`).join('')}
           </select>
           <input type="text" class="form-control form-control-sm" id="sop-repuesto-detalle" placeholder="PN u otros códigos">
+          <input type="url" class="form-control form-control-sm" id="sop-repuesto-link" placeholder="Link AliExpress (Opcional)" style="min-width:120px;">
           <button class="btn btn-secondary btn-sm" onclick="FlujoSoporte.agregarRepuesto('${registro._registroId}')">+ Agregar</button>
         </div>
       </div>
@@ -374,18 +375,19 @@ const FlujoSoporte = (() => {
   async function agregarRepuesto(registroId) {
     const tipo    = document.getElementById('sop-repuesto-select')?.value;
     const detalle = document.getElementById('sop-repuesto-detalle')?.value?.trim();
+    const link    = document.getElementById('sop-repuesto-link')?.value?.trim();
     if (!tipo) { Toast.warning('Selecciona un tipo de repuesto'); return; }
 
     const nombre = tipo + (detalle ? ` (${detalle})` : '');
     if (!_pendingRepuestos[registroId]) _pendingRepuestos[registroId] = [];
-    _pendingRepuestos[registroId].push({ nombre, detalle });
+    _pendingRepuestos[registroId].push({ nombre, detalle, link });
 
     const lotes = await LocalCache.getLotes();
     for (const lote of lotes) {
       const eq = lote.equipos?.find(e => e._registroId === registroId);
       if (eq) {
         if (!eq._repuestosUsados) eq._repuestosUsados = [];
-        eq._repuestosUsados.push({ nombre, detalle, timestamp: new Date().toISOString() });
+        eq._repuestosUsados.push({ nombre, detalle, link, timestamp: new Date().toISOString() });
         await LocalCache.updateLote(lote);
         _refreshRepuestosList(registroId, eq._repuestosUsados);
         break;
@@ -393,6 +395,8 @@ const FlujoSoporte = (() => {
     }
     document.getElementById('sop-repuesto-select').value = '';
     document.getElementById('sop-repuesto-detalle').value = '';
+    const linkEl = document.getElementById('sop-repuesto-link');
+    if (linkEl) linkEl.value = '';
   }
 
   async function quitarRepuesto(registroId, idx) {
@@ -413,7 +417,7 @@ const FlujoSoporte = (() => {
     if (!el) return;
     el.innerHTML = (repuestos||[]).map((r, i) => `
       <span class="badge badge-accent" style="gap:6px">
-        ${r.nombre}
+        ${r.nombre} ${r.link ? `<a href="${r.link}" target="_blank" style="text-decoration:none" title="Ver Link">🔗</a>` : ''}
         <button onclick="FlujoSoporte.quitarRepuesto('${registroId}',${i})" style="background:none;border:none;cursor:pointer;color:inherit;font-size:0.8rem">✕</button>
       </span>
     `).join('');

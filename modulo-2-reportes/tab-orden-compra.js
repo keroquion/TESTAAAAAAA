@@ -16,6 +16,7 @@ const TabOrdenCompra = (() => {
     { key: 'serie',   label: 'Serie',              default: true },
     { key: 'repuesto',label: 'Repuesto a comprar', default: true },
     { key: 'pn',      label: 'PN / Código',        default: true },
+    { key: 'link',    label: 'Link AliExpress',    default: true },
     { key: 'fecha',   label: 'Fecha solicitud',    default: true },
     { key: 'llego',   label: '\u25a1 Llegó',            default: true },
     { key: 'fecha_col', label: 'Fecha colocación', default: true },
@@ -98,6 +99,7 @@ const TabOrdenCompra = (() => {
             lote, eq,
             repuesto: rep.repuesto || rep.nombre || '—',
             pn:       rep.pn || '—',
+            link:     rep.link || '',
             fecha:    rep.timestamp ? new Date(rep.timestamp).toLocaleDateString('es-PE') : new Date(lote.fechaCreacion).toLocaleDateString('es-PE'),
             tecnico:  lote.tecnico || eq._tecnico || '—',
           });
@@ -133,6 +135,7 @@ const TabOrdenCompra = (() => {
         case 'serie':    return `<td style="border:1px solid #ccc;padding:5px 8px;font-size:0.72rem">${f.eq.SERIE||'—'}</td>`;
         case 'repuesto': return `<td style="border:1px solid #ccc;padding:5px 8px;font-weight:600;color:var(--accent)">${f.repuesto}</td>`;
         case 'pn':       return `<td style="border:1px solid #ccc;padding:5px 8px;font-family:monospace">${f.pn}</td>`;
+        case 'link':     return `<td style="border:1px solid #ccc;padding:5px 8px;text-align:center">${f.link ? `<a href="${f.link}" target="_blank" style="color:var(--accent);text-decoration:none;font-weight:600" title="${f.link}">🔗 Abrir</a>` : '—'}</td>`;
         case 'fecha':    return `<td style="border:1px solid #ccc;padding:5px 8px;white-space:nowrap">${f.fecha}</td>`;
         case 'llego':    return `<td style="border:1px solid #ccc;padding:5px 8px;text-align:center;font-size:1.1rem">□</td>`;
         case 'fecha_col':return `<td style="border:1px solid #ccc;padding:5px 8px">&nbsp;</td>`;
@@ -209,7 +212,7 @@ const TabOrdenCompra = (() => {
       <table>
         <thead><tr>
           <th>#</th><th>Código</th><th>Marca</th><th>Modelo</th><th>Serie</th>
-          <th>Repuesto a comprar</th><th>PN / Código</th><th>Fecha solicitud</th>
+          <th>Repuesto a comprar</th><th>PN / Código</th><th>Link AliExpress</th><th>Fecha solicitud</th>
           <th class="checkbox-cell" style="min-width:45px">□ Llegó</th>
           <th class="empty-cell">Fecha colocación</th><th class="empty-cell">Técnico instalación</th>
         </tr></thead>
@@ -222,6 +225,7 @@ const TabOrdenCompra = (() => {
             <td style="font-size:9px">${f.eq.SERIE||'—'}</td>
             <td style="font-weight:700;color:#1a1aff">${f.repuesto}</td>
             <td style="font-family:monospace">${f.pn}</td>
+            <td>${f.link ? `<a href="${f.link}" target="_blank" style="color:#1a1aff">Abrir</a>` : '—'}</td>
             <td style="white-space:nowrap">${f.fecha}</td>
             <td class="checkbox-cell" style="font-size:14px">□</td>
             <td class="empty-cell">&nbsp;</td>
@@ -242,14 +246,14 @@ const TabOrdenCompra = (() => {
 
     if (!filas.length) { Toast.warning('No hay repuestos para exportar'); return; }
 
-    const headers = ['Lote','Código','Marca','Modelo','Serie','Repuesto a comprar','PN/Código','Fecha solicitud','□ Llegó','Fecha colocación','Técnico instalación'];
+    const headers = ['Lote','Código','Marca','Modelo','Serie','Repuesto a comprar','PN/Código','Link AliExpress','Fecha solicitud','□ Llegó','Fecha colocación','Técnico instalación'];
     const rows = filas.map(f => [
       f.lote.titulo, f.eq.CODIGO||'', f.eq.MARCA||'', f.eq.MODELO||'', f.eq.SERIE||'',
-      f.repuesto, f.pn, f.fecha, '', '', '',
+      f.repuesto, f.pn, f.link, f.fecha, '', '', '',
     ]);
 
     const ws = XLSX.utils.aoa_to_sheet([headers, ...rows]);
-    ws['!cols'] = [14,10,10,18,16,20,16,14,8,14,18].map(w=>({wch:w}));
+    ws['!cols'] = [14,10,10,18,16,20,16,25,14,8,14,18].map(w=>({wch:w}));
     headers.forEach((_, c) => {
       const cell = XLSX.utils.encode_cell({r:0, c});
       if (!ws[cell]) return;

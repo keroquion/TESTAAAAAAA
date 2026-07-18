@@ -133,7 +133,7 @@ const LocalCache = (() => {
     return lotes.find(l => l.activo) || null;
   }
 
-  async function crearLote(titulo, tecnico) {
+  async function crearLote(titulo, tecnico, tipoLote = '') {
     const lotes = await getLotes();
     // Desactivar anteriores
     for (const l of lotes) { if(l.activo) { l.activo=false; await put('lotes', l); } }
@@ -141,6 +141,7 @@ const LocalCache = (() => {
       id: `lote_${Date.now()}`,
       titulo: titulo || `LOTE ${101 + lotes.length}`,
       tecnico: tecnico || '',
+      tipoLote: tipoLote || '',
       _ownerId: (window.AuthService && AuthService.getUsuarioActual()) ? AuthService.getUsuarioActual().username : 'admin',
       fechaCreacion: new Date().toISOString(),
       activo: true,

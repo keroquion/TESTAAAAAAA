@@ -45,7 +45,7 @@ const HistorialView = (() => {
           <div style="display:flex;align-items:center;gap:10px">
             <span style="font-size:1.2rem">📦</span>
             <div>
-              <div style="font-weight:700">${lote.titulo} ${lote.activo?'<span class="badge badge-success" style="margin-left:6px;font-size:0.62rem">ACTIVO</span>':''}</div>
+              <div style="font-weight:700">${lote.titulo} ${lote.activo?'<span class="badge badge-success" style="margin-left:6px;font-size:0.62rem">ACTIVO</span>':''} ${lote.tipoLote?'<span class="badge" style="background:var(--purple);color:#fff;margin-left:6px;font-size:0.62rem">'+lote.tipoLote+'</span>':''}</div>
               <div style="font-size:0.72rem;color:var(--text-muted)">${fecha} · ${eq.length} equipo(s) · ${correctos} correctos ${lote.tecnico ? ' · 👨‍🔧 '+lote.tecnico : ''}</div>
             </div>
           </div>
@@ -145,6 +145,13 @@ const HistorialView = (() => {
         <label class="form-label">👨‍🔧 Técnico Encargado</label>
         <input type="text" class="form-control" id="edit-lote-tecnico" value="${Formatters.safe(lote.tecnico || '')}" autocomplete="off">
       </div>
+      <div class="form-group">
+        <label class="form-label">🏷️ Tipo de Lote</label>
+        <select class="form-control" id="edit-lote-tipo">
+          <option value="">— Ninguno —</option>
+          ${(APP_CONFIG.catalogos.tiposLote || []).map(t => `<option value="${t}" ${lote.tipoLote === t ? 'selected' : ''}>${t}</option>`).join('')}
+        </select>
+      </div>
       <div class="modal-footer">
         <button class="btn btn-secondary" onclick="ModalGenerico.close()">Cancelar</button>
         <button class="btn btn-primary" onclick="HistorialView._histGuardarEdicion('${lote.id}')">💾 Guardar</button>
@@ -155,6 +162,7 @@ const HistorialView = (() => {
   const _histGuardarEdicion = async (id) => {
     const titulo = document.getElementById('edit-lote-titulo')?.value?.trim();
     const tecnico = document.getElementById('edit-lote-tecnico')?.value?.trim() || '';
+    const tipoLote = document.getElementById('edit-lote-tipo')?.value || '';
     if (!titulo) { Toast.warning('Escribe un título'); return; }
 
     const lotes = await LocalCache.getLotes();
@@ -162,6 +170,7 @@ const HistorialView = (() => {
     if (lote) {
       lote.titulo = titulo;
       lote.tecnico = tecnico;
+      lote.tipoLote = tipoLote;
       await LocalCache.updateLote(lote);
       ModalGenerico.close();
       Toast.success('Lote actualizado');
