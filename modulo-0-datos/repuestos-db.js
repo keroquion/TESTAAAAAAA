@@ -23,7 +23,49 @@ const RepuestosDB = (() => {
   }
 
   function _makeKey(repuesto, modelo) {
-    return (repuesto || '') + '|' + _norm(modelo);
+    return (repuesto || '').toUpperCase().trim() + '|' + _norm(modelo);
+  }
+
+  async function init() {
+    if (_loaded && _memMap.size > 0) return;
+    await _loadFromIDB();
+    await reconstruirDesdeLotes();
+  }
+
+  async function reconstruirDesdeLotes(lotes) {
+    try {
+      if (!lotes && window.LocalCache?.getLotes) lotes = await LocalCache.getLotes();
+    } catch { lotes = []; }
+    let agregados = 0;
+    for (const lote of (lotes || [])) {
+      for (const eq of (lote.equipos || [])) {
+        if (!eq.MODELO) continue;
+        for (const r of (eq._repuestosUsados || [])) {
+          let repuesto = r.repuesto || r.tipo || '';
+          let rawPn = r.pn || r.detalle || '';
+          if (!repuesto && r.nombre) {
+            const parts = r.nombre.split('(');
+            repuesto = parts[0].trim();
+            if (!rawPn && parts[1]) {
+              rawPn = parts[1].replace(/pn:\s*/i, '').replace(/\)/g, '').trim();
+            }
+          }
+          const cleanPn = (rawPn || '').replace(/^pn:\s*/i, '').replace(/[\(\)]/g, '').trim();
+          if (repuesto) {
+            const key = _makeKey(repuesto, eq.MODELO);
+            let entry = _memMap.get(key);
+            if (!entry || (cleanPn && !entry.pn)) {
+              await guardarPN(repuesto, eq.MODELO, cleanPn);
+              agregados++;
+            }
+          }
+        }
+      }
+    }
+    if (agregados > 0) {
+      console.log(`[RepuestosDB] 🔄 Reconstruidos ${agregados} repuestos/PNs desde historial de Lotes`);
+    }
+    return agregados;
   }
 
   async function _syncCatalogTipos() {
@@ -57,6 +99,7 @@ const RepuestosDB = (() => {
         _memMap.set(entry.key, entry);
       }
       _loaded = true;
+      await reconstruirDesdeLotes();
       await _syncCatalogTipos();
       console.log(`[RepuestosDB] ✅ Cargados ${entries.length} entradas desde Sheets`);
     } catch (e) {
@@ -107,6 +150,7 @@ const RepuestosDB = (() => {
 
   function buscarPN(repuesto, modelo) {
     if (!repuesto || !modelo) return null;
+    const repuestoNorm = repuesto.toUpperCase().trim();
     const keyExact = _makeKey(repuesto, modelo);
     const modeloNorm = _norm(modelo);
 
@@ -116,11 +160,11 @@ const RepuestosDB = (() => {
     let bestPn = null;
     let bestUsos = 0;
     for (const [k, entry] of _memMap) {
-      if (entry.repuesto !== repuesto) continue;
+      if ((entry.repuesto || '').toUpperCase().trim() !== repuestoNorm) continue;
       const entryNorm = k.split('|')[1] || '';
       const isSimilar = entryNorm === modeloNorm ||
-        (entryNorm.length > 4 && modeloNorm.includes(entryNorm)) ||
-        (modeloNorm.length > 4 && entryNorm.includes(modeloNorm));
+        (entryNorm.length >= 3 && modeloNorm.includes(entryNorm)) ||
+        (modeloNorm.length >= 3 && entryNorm.includes(modeloNorm));
       if (!isSimilar) continue;
       for (const m of (entry.modelos || [])) {
         if (m.pn && m.usos > bestUsos) { bestPn = m.pn; bestUsos = m.usos; }
@@ -132,10 +176,12 @@ const RepuestosDB = (() => {
 
   function getSugerenciasPN(repuesto) {
     if (!repuesto) return [];
+    const repuestoNorm = repuesto.toUpperCase().trim();
     const pns = new Set();
     for (const [, entry] of _memMap) {
-      if (entry.repuesto !== repuesto) continue;
+      if ((entry.repuesto || '').toUpperCase().trim() !== repuestoNorm) continue;
       for (const m of (entry.modelos || [])) { if (m.pn) pns.add(m.pn); }
+      if (entry.pn) pns.add(entry.pn);
     }
     return [...pns];
   }
@@ -190,7 +236,7 @@ const RepuestosDB = (() => {
   }
 
   return {
-    loadFromRemote, guardarPN, buscarPN, getSugerenciasPN,
+    init, loadFromRemote, reconstruirDesdeLotes, guardarPN, buscarPN, getSugerenciasPN,
     getAll, eliminarEntrada, editarPN
   };
 })();

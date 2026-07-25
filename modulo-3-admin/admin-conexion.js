@@ -28,6 +28,9 @@ const AdminConexion = (() => {
         Toast.success(`Historial sincronizado: ${stats.total} lotes cargados`);
         window._histLotes = await LocalCache.getLotes();
       }
+      if (window.RepuestosDB?.loadFromRemote) {
+        await RepuestosDB.loadFromRemote().catch(() => {});
+      }
     } catch(e) {
       // Ignorar silenciosamente si no hay red o da error
     }

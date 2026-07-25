@@ -132,6 +132,24 @@ const AdminRepuestosDB = (() => {
     }
   }
 
+  async function reconstruirDesdeHistorial() {
+    if (!confirm('¿Escanear todo el historial para extraer repuestos y PNs? (Puede tardar unos segundos)')) return;
+    const btn = document.querySelector('[onclick="AdminRepuestosDB.reconstruirDesdeHistorial()"]');
+    if (btn) { btn.disabled = true; btn.innerHTML = '<span class="spinner"></span> Procesando historial...'; }
+    try {
+      if (!window.RepuestosDB?.reconstruirDesdeLotes) {
+        throw new Error('Función no disponible');
+      }
+      const agregados = await RepuestosDB.reconstruirDesdeLotes();
+      Toast.success(`✅ Reconstrucción completa. Se recuperaron ${agregados} repuestos/PNs del historial.`);
+      render();
+    } catch(e) {
+      Toast.error('Error en la reconstrucción: ' + e.message);
+    } finally {
+      if (btn) { btn.disabled = false; btn.innerHTML = '🔄 Reconstruir desde Historial'; }
+    }
+  }
+
   function _renderAliases() {
     const el = document.getElementById('aliases-lista');
     if (!el) return;
@@ -183,6 +201,7 @@ const AdminRepuestosDB = (() => {
     eliminarEntrada, 
     filtrarRepuestos, 
     syncRepuestosDB, 
+    reconstruirDesdeHistorial,
     guardarAlias, 
     eliminarAlias 
   };

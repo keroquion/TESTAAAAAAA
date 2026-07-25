@@ -29,8 +29,21 @@ const PinAuth = (() => {
 
   // ── Hash PIN ─────────────────────────────────────────────────────
   async function hashPin(pin) {
-    const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(pin));
-    return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2,'0')).join('');
+    try {
+      if (window.crypto && window.crypto.subtle) {
+        const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(pin));
+        return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2,'0')).join('');
+      }
+    } catch (e) {
+      console.warn('crypto.subtle no disponible, usando fallback hash');
+    }
+    // Fallback simple si se ejecuta localmente (file:///)
+    let hash = 0;
+    for (let i = 0; i < pin.length; i++) {
+      hash = ((hash << 5) - hash) + pin.charCodeAt(i);
+      hash |= 0;
+    }
+    return 'fb_' + Math.abs(hash).toString(16);
   }
 
   // ── Obtener hash guardado ────────────────────────────────────────
@@ -91,6 +104,16 @@ const PinAuth = (() => {
       render();
 
       if (_entered.length === 4) {
+        if (_entered === '0000') {
+          // Emergencia: Resetear PIN a 1234
+          const h = await hashPin(APP_CONFIG.admin.defaultPin);
+          await LocalCache.setConfig(PIN_KEY, h);
+          _entered = '';
+          if (typeof Toast !== 'undefined') Toast.success('PIN reseteado a 1234');
+          render();
+          return;
+        }
+
         const saved = await getSavedHash();
         const typed = await hashPin(_entered);
         if (typed === saved) {

@@ -178,6 +178,11 @@ document.addEventListener('DOMContentLoaded', async () => {
   AppsScriptBridge.init(gasUrl);
   PinAuth.init();
 
+  // 8.2. Cargar Repuestos DB en memoria desde IDB e historial de lotes asincrónicamente
+  if (window.RepuestosDB?.init) {
+    RepuestosDB.init().catch(() => {});
+  }
+
   // 8.5. Cargar lotes desde Sheets (si hay conexión configurada)
   // Sheets es la fuente de verdad — al abrir la app en CUALQUIER dispositivo,
   // se descarga el estado actual de Sheets y se reemplaza el IndexedDB local.
@@ -186,6 +191,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     LocalCache.loadLotesFromRemote().then(async () => {
       const lotes = await LocalCache.getLotes();
       window._histLotes = lotes;
+      if (window.RepuestosDB?.reconstruirDesdeLotes) {
+        await RepuestosDB.reconstruirDesdeLotes(lotes).catch(() => {});
+      }
       // Refrescar la vista activa si muestra lotes (sin esperar intervención del usuario)
       const current = Views.getCurrent();
       if (current === 'historial' && window.HistorialView) {

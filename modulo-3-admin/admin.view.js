@@ -290,6 +290,7 @@ const AdminView = (() => {
             oninput="AdminRepuestosDB.filtrarRepuestos(this.value)"
             style="width:100%;max-width:300px;margin-bottom:12px;padding:6px 12px;border:1px solid var(--border);border-radius:var(--radius-md);background:var(--bg-card);color:var(--text-primary)">
           <button class="btn btn-secondary btn-sm" onclick="AdminRepuestosDB.syncRepuestosDB()">☁️ Sincronizar con Sheets</button>
+          <button class="btn btn-secondary btn-sm" onclick="AdminRepuestosDB.reconstruirDesdeHistorial()">🔄 Reconstruir desde Historial</button>
         </div>
         
         <div class="card" style="margin-bottom:16px">

@@ -105,7 +105,7 @@ const FlujoSoporte = (() => {
           `).join('')}
         </div>
         <div class="sop-repuesto-row">
-          <select class="form-control form-control-sm" id="sop-repuesto-select">
+          <select class="form-control form-control-sm" id="sop-repuesto-select" onchange="FlujoSoporte.onRepuestoSelectChange(this.value,'${(registro.MODELO||'').replace(/'/g,"\\'")}')">
             <option value="">— Tipo repuesto —</option>
             ${(APP_CONFIG.catalogos.tiposRepuesto||[]).map(r=>`<option value="${r}">${r}</option>`).join('')}
           </select>
@@ -372,6 +372,20 @@ const FlujoSoporte = (() => {
   // ── Repuestos ────────────────────────────────────────────────────────────
   const _pendingRepuestos = {};
 
+  async function onRepuestoSelectChange(tipo, modelo) {
+    if (!tipo || !modelo || !window.RepuestosDB?.buscarPN) return;
+    const pn = await RepuestosDB.buscarPN(tipo, modelo);
+    if (pn) {
+      const pnEl = document.getElementById('sop-repuesto-detalle');
+      if (pnEl && !pnEl.value) {
+        pnEl.value = pn;
+        pnEl.style.borderColor = 'var(--accent)';
+        setTimeout(() => pnEl.style.borderColor = '', 2500);
+        if (typeof Toast !== 'undefined') Toast.info(`💡 PN sugerido para ${modelo}: ${pn}`);
+      }
+    }
+  }
+
   async function agregarRepuesto(registroId) {
     const tipo    = document.getElementById('sop-repuesto-select')?.value;
     const detalle = document.getElementById('sop-repuesto-detalle')?.value?.trim();
@@ -387,8 +401,11 @@ const FlujoSoporte = (() => {
       const eq = lote.equipos?.find(e => e._registroId === registroId);
       if (eq) {
         if (!eq._repuestosUsados) eq._repuestosUsados = [];
-        eq._repuestosUsados.push({ nombre, detalle, link, timestamp: new Date().toISOString() });
+        eq._repuestosUsados.push({ nombre, repuesto: tipo, pn: detalle, detalle, link, timestamp: new Date().toISOString() });
         await LocalCache.updateLote(lote);
+        if (detalle && window.RepuestosDB?.guardarPN) {
+          await RepuestosDB.guardarPN(tipo, eq.MODELO, detalle);
+        }
         _refreshRepuestosList(registroId, eq._repuestosUsados);
         break;
       }
@@ -455,7 +472,7 @@ const FlujoSoporte = (() => {
     setTimeout(() => refreshFotosEnModal(registro._registroId), 80);
   }
 
-  return { renderStepper, openModal, confirmarSoporte, agregarRepuesto, quitarRepuesto, analizarEtiqueta, analizarFotoGuardada, refreshFotosEnModal };
+  return { renderStepper, openModal, confirmarSoporte, agregarRepuesto, quitarRepuesto, analizarEtiqueta, analizarFotoGuardada, refreshFotosEnModal, onRepuestoSelectChange };
 })();
 
 window.FlujoSoporte = FlujoSoporte;
