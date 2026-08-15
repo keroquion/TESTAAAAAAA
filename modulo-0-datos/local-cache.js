@@ -134,92 +134,143 @@ const LocalCache = (() => {
   }
 
   async function crearLote(titulo, tecnico, tipoLote = '') {
-    const lotes = await getLotes();
-    // Desactivar anteriores
-    for (const l of lotes) { if(l.activo) { l.activo=false; await put('lotes', l); } }
-    const nuevo = {
-      id: `lote_${Date.now()}`,
-      titulo: titulo || `LOTE ${101 + lotes.length}`,
-      tecnico: tecnico || '',
-      tipoLote: tipoLote || '',
-      _ownerId: (window.AuthService && AuthService.getUsuarioActual()) ? AuthService.getUsuarioActual().username : 'admin',
-      fechaCreacion: new Date().toISOString(),
-      activo: true,
-      equipos: [],
-      synced: false,
-    };
-    await put('lotes', nuevo);
-    _syncLotesRemoto();
-    return nuevo;
+    return new Promise((resolve, reject) => {
+      _loteMutex = _loteMutex.then(async () => {
+        try {
+          const lotes = await getLotes();
+          // Desactivar anteriores
+          for (const l of lotes) { if(l.activo) { l.activo=false; await put('lotes', l); } }
+          const nuevo = {
+            id: `lote_${Date.now()}`,
+            titulo: titulo || `LOTE ${101 + lotes.length}`,
+            tecnico: tecnico || '',
+            tipoLote: tipoLote || '',
+            _ownerId: (window.AuthService && AuthService.getUsuarioActual()) ? AuthService.getUsuarioActual().username : 'admin',
+            fechaCreacion: new Date().toISOString(),
+            activo: true,
+            equipos: [],
+            synced: false,
+          };
+          await put('lotes', nuevo);
+          _syncLotesRemoto();
+          resolve(nuevo);
+        } catch(e) { reject(e); }
+      });
+    });
   }
 
   async function updateLote(lote) {
-    lote.synced = false;
-    await put('lotes', lote);
-    _syncLotesRemoto();
+    return new Promise((resolve, reject) => {
+      _loteMutex = _loteMutex.then(async () => {
+        try {
+          // Merge to prevent overwriting new scanned items if caller had stale data
+          const currentLotes = await getLotes();
+          const dbLote = currentLotes.find(l => l.id === lote.id);
+          if (dbLote) {
+            // Keep fresh items that were added by scanner while UI was editing
+            const newEquipos = dbLote.equipos.filter(eq => !lote.equipos.find(x => x._registroId === eq._registroId));
+            if (newEquipos.length > 0) {
+              lote.equipos = [...newEquipos, ...lote.equipos];
+            }
+          }
+          lote.synced = false;
+          await put('lotes', lote);
+          _syncLotesRemoto();
+          resolve();
+        } catch(e) { reject(e); }
+      });
+    });
   }
 
   async function deleteLote(loteId) {
-    await del('lotes', loteId);
+    return new Promise((resolve, reject) => {
+      _loteMutex = _loteMutex.then(async () => {
+        try {
+          await del('lotes', loteId);
 
-    // Registrar ID del lote eliminado localmente para evitar re-importación rápida
-    let deletedIds = await getConfig('deleted_lote_ids', []);
-    if (!deletedIds.includes(loteId)) {
-      deletedIds.push(loteId);
-      await setConfig('deleted_lote_ids', deletedIds);
-    }
+          let deletedIds = await getConfig('deleted_lote_ids', []);
+          if (!deletedIds.includes(loteId)) {
+            deletedIds.push(loteId);
+            await setConfig('deleted_lote_ids', deletedIds);
+          }
 
-    // Eliminado: auto-activar el primer lote si no hay activo
-    // (A petición del usuario, si se borra el activo no debe abrirse otro automáticamente)
-    // Sincronizar inmediatamente
-    await syncLotesRemotoInmediato();
+          await syncLotesRemotoInmediato();
+          resolve();
+        } catch(e) { reject(e); }
+      });
+    });
   }
 
   async function continuarLote(loteId) {
-    const lotes = await getLotes();
-    let targetLote = null;
-    for (const l of lotes) {
-      if (l.id === loteId) {
-        l.activo = true;
-        l.synced = false;
-        await put('lotes', l);
-        targetLote = l;
-      } else if (l.activo) {
-        l.activo = false;
-        l.synced = false;
-        await put('lotes', l);
-      }
-    }
-    _syncLotesRemoto();
-    return targetLote;
+    return new Promise((resolve, reject) => {
+      _loteMutex = _loteMutex.then(async () => {
+        try {
+          const lotes = await getLotes();
+          let targetLote = null;
+          for (const l of lotes) {
+            if (l.id === loteId) {
+              l.activo = true;
+              l.synced = false;
+              await put('lotes', l);
+              targetLote = l;
+            } else if (l.activo) {
+              l.activo = false;
+              l.synced = false;
+              await put('lotes', l);
+            }
+          }
+          _syncLotesRemoto();
+          resolve(targetLote);
+        } catch(e) { reject(e); }
+      });
+    });
   }
 
+  let _loteMutex = Promise.resolve();
+
   async function agregarEquipoALote(loteId, equipo, obsPersonal='') {
-    const lotes = await getLotes();
-    const lote = lotes.find(l=>l.id===loteId);
-    if (!lote) return null;
-    const registro = {
-      ...equipo,
-      _obsPersonal: obsPersonal,
-      _timestamp: new Date().toISOString(),
-      _registroId: `reg_${Date.now()}`,
-      _fotos: [],
-    };
-    lote.equipos.unshift(registro);
-    lote.synced = false;
-    await put('lotes', lote);
-    _syncLotesRemoto();
-    return registro;
+    return new Promise((resolve, reject) => {
+      _loteMutex = _loteMutex.then(async () => {
+        try {
+          const lotes = await getLotes();
+          const lote = lotes.find(l=>l.id===loteId);
+          if (!lote) { resolve(null); return; }
+          const registro = {
+            ...equipo,
+            _obsPersonal: obsPersonal,
+            _timestamp: new Date().toISOString(),
+            _registroId: `reg_${Date.now()}`,
+            _fotos: [],
+          };
+          lote.equipos.unshift(registro);
+          lote.synced = false;
+          await put('lotes', lote);
+          _syncLotesRemoto();
+          resolve(registro);
+        } catch (e) {
+          reject(e);
+        }
+      });
+    });
   }
 
   async function eliminarEquipoDeLote(loteId, registroId) {
-    const lotes = await getLotes();
-    const lote = lotes.find(l=>l.id===loteId);
-    if (!lote) return;
-    lote.equipos = lote.equipos.filter(e=>e._registroId!==registroId);
-    lote.synced = false;
-    await put('lotes', lote);
-    _syncLotesRemoto();
+    return new Promise((resolve, reject) => {
+      _loteMutex = _loteMutex.then(async () => {
+        try {
+          const lotes = await getLotes();
+          const lote = lotes.find(l=>l.id===loteId);
+          if (!lote) { resolve(); return; }
+          lote.equipos = lote.equipos.filter(e=>e._registroId!==registroId);
+          lote.synced = false;
+          await put('lotes', lote);
+          _syncLotesRemoto();
+          resolve();
+        } catch (e) {
+          reject(e);
+        }
+      });
+    });
   }
 
   // ── SYNC LOTES A REMOTO (debounced) ──────────────────────────────
@@ -228,17 +279,27 @@ const LocalCache = (() => {
     clearTimeout(_syncTimer);
     _syncTimer = setTimeout(async () => {
       try {
-        const lotes = await getLotes();
-        await AppsScriptBridge.saveLotes(lotes);
-        // Marcar los lotes como sincronizados localmente
-        for (const l of lotes) {
-          if (!l.synced) {
-            l.synced = true;
-            await put('lotes', l);
-          }
-        }
-        // Eliminado: await setConfig('deleted_lote_ids', []); // NO LIMPIAR, para evitar que lotes borrados vuelvan de Sheets
-        console.log('✅ Lotes sincronizados a Sheets (' + lotes.length + ')');
+        const lotesSnapshot = await getLotes();
+        await AppsScriptBridge.saveLotes(lotesSnapshot);
+        // Marcar los lotes como sincronizados localmente (USANDO MUTEX Y GET FRESH)
+        await new Promise(resolve => {
+          _loteMutex = _loteMutex.then(async () => {
+            try {
+              const freshLotes = await getLotes();
+              for (const snap of lotesSnapshot) {
+                if (!snap.synced) {
+                  const dbLote = freshLotes.find(x => x.id === snap.id);
+                  if (dbLote) {
+                    dbLote.synced = true;
+                    await put('lotes', dbLote);
+                  }
+                }
+              }
+            } catch(e) {}
+            resolve();
+          });
+        });
+        console.log('✅ Lotes sincronizados a Sheets (' + lotesSnapshot.length + ')');
       } catch (err) {
         console.warn('[LocalCache] Error sincronizando lotes:', err.message);
       }
@@ -250,17 +311,27 @@ const LocalCache = (() => {
     if (!APP_CONFIG.appsScript.webAppUrl) return;
     clearTimeout(_syncTimer);
     try {
-      const lotes = await getLotes();
-      await AppsScriptBridge.saveLotes(lotes);
-      // Marcar los lotes como sincronizados localmente
-      for (const l of lotes) {
-        if (!l.synced) {
-          l.synced = true;
-          await put('lotes', l);
-        }
-      }
-      // Eliminado: await setConfig('deleted_lote_ids', []); // NO LIMPIAR
-      console.log('✅ Lotes sincronizados a Sheets inmediatamente (' + lotes.length + ')');
+      const lotesSnapshot = await getLotes();
+      await AppsScriptBridge.saveLotes(lotesSnapshot);
+      // Marcar los lotes como sincronizados localmente (USANDO MUTEX Y GET FRESH)
+      await new Promise(resolve => {
+        _loteMutex = _loteMutex.then(async () => {
+          try {
+            const freshLotes = await getLotes();
+            for (const snap of lotesSnapshot) {
+              if (!snap.synced) {
+                const dbLote = freshLotes.find(x => x.id === snap.id);
+                if (dbLote) {
+                  dbLote.synced = true;
+                  await put('lotes', dbLote);
+                }
+              }
+            }
+          } catch(e) {}
+          resolve();
+        });
+      });
+      console.log('✅ Lotes sincronizados a Sheets inmediatamente (' + lotesSnapshot.length + ')');
     } catch (err) {
       console.warn('[LocalCache] Error sincronizando lotes inmediatamente:', err.message);
     }
