@@ -94,19 +94,14 @@ const TabOrdenCompra = (() => {
       for (const eq of (lote.equipos || [])) {
         const repuestos = eq._repuestosUsados || [];
         if (!repuestos.length) {
-          const isEnvio = (lote.tipoLote && lote.tipoLote.includes('ENVIO')) || 
-                          lote.titulo.toLowerCase().includes('envio') || 
-                          lote.titulo.toLowerCase().includes('repara');
-          if (isEnvio) {
-            filas.push({
-              lote, eq,
-              repuesto: '— (Envío sin repuestos)',
-              pn: '—',
-              link: '',
-              fecha: new Date(lote.fechaCreacion).toLocaleDateString('es-PE'),
-              tecnico: lote.tecnico || eq._tecnico || '—',
-            });
-          }
+          filas.push({
+            lote, eq,
+            repuesto: '— (Sin repuestos especificados)',
+            pn: '—',
+            link: '',
+            fecha: new Date(lote.fechaCreacion).toLocaleDateString('es-PE'),
+            tecnico: lote.tecnico || eq._tecnico || '—',
+          });
           continue;
         }
         for (const rep of repuestos) {
